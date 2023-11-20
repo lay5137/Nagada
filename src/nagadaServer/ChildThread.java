@@ -9,7 +9,7 @@ import java.net.Socket;
 
 public class ChildThread implements Runnable {
 
-    Socket childSocket;      // 클라이언트와 통신하기 위한 소켓
+    Socket childSocket;		// 클라이언트와 통신하기 위한 소켓
     Server server;
 
     // 문자열을 주고받기만 하는 간단한 통신에서 효율적
@@ -19,10 +19,12 @@ public class ChildThread implements Runnable {
 
     // 클라이언트로부터 전송받은 데이터를 저장하기 위한 변수
     String receivedMessage;
+    // 로그인 성공 시 미리 저장해둠
+    String userID;
 
     // 생성자
     public ChildThread(Socket socket, Server server) {
-        childSocket = socket;   // 클라이언트와 통신할 수 있는 소켓 정보를 childSocket에 저장
+        childSocket = socket;	// 클라이언트와 통신할 수 있는 소켓 정보를 childSocket에 저장
         this.server = server;
 
         try {
@@ -41,13 +43,13 @@ public class ChildThread implements Runnable {
     @Override
     public void run() {
         try {
-            while (true) {   // 여기서 반복문 걸려서 계속 연결된 상태로 유지되고 있음
+            while (true) {	// 여기서 반복문 걸려서 계속 연결된 상태로 유지되고 있음
                 receivedMessage = reader.readLine();
                 System.out.println("Server Receive: " + receivedMessage + "  @From:" + childSocket.getInetAddress());
                 divideMessageAndProcess(receivedMessage);
             }
         } catch (Exception e) {
-            server.removeClient(this);   // 클라이언트가 종료되면 해당 클라이언트 스레드를 서버에서 제거
+            server.removeClient(this);	// 클라이언트가 종료되면 해당 클라이언트 스레드를 서버에서 제거
         } finally {
             try {
                 childSocket.close();
@@ -88,6 +90,9 @@ public class ChildThread implements Runnable {
             case "APPLY":
                 handleApply(parts);
                 break;
+            case "CANCEL":
+                handleCancel(parts);
+                break;
             default:
                 // 알 수 없는 명령에 대한 처리
                 sendMessage("UNKNOWN_COMMAND");
@@ -107,6 +112,7 @@ public class ChildThread implements Runnable {
         boolean loginSuccessful = true; // 임시로 항상 성공으로 설정
         if (loginSuccessful) {
             sendMessage("LOGIN_SUCCESS");
+            userID = parts[1];
         } else {
             sendMessage("LOGIN_FAIL");
         }
@@ -158,13 +164,35 @@ public class ChildThread implements Runnable {
             return;
         }
         String dayTime = parts[1]; // "주간" 또는 "야간"
-        String date = parts[2]; // "10/8" 등의 날짜
-        // TODO: 지원 로직 구현
-        // 동시성 고려가 필요하며, 실제 로직에서는 서버의 applyForDate 메소드를 호출할 것입니다.
+        String date = parts[2]; // 날짜
+        server.processAddApplication(dayTime, date, userID);
         String response = "APPLY_SUCCESS";
         sendMessage(response);
     }
 
 
+    private void handleCancel(String[] parts) {
+        if (parts.length < 3) {
+            sendMessage("CANCEL_FAIL|Invalid message format");
+            return;
+        }
+        String dayTime = parts[1]; // "주간" 또는 "야간"
+        String date = parts[2];  // 날짜
+        // TODO: 지원 로직 구현
+        String response = "CANCEL_SUCCESS";
+        sendMessage(response);
+    }
+
+
+
+    // Getter for userID
+    public String getUserID() {
+        return userID;
+    }
+
 
 }
+
+
+
+

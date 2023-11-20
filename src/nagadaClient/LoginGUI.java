@@ -101,7 +101,7 @@ public class LoginGUI extends JFrame {
 
                     // 서버에서 응답 올때까지 좀만 기다리기
                     try {
-                        Thread.sleep(1000);
+                        Thread.sleep(500);
                     } catch (Exception e1) {
                         e1.printStackTrace();
                     }
@@ -148,7 +148,7 @@ public class LoginGUI extends JFrame {
     // Wait for the login result from the server
     private boolean waitForLoginResult() {
         long startTime = System.currentTimeMillis();
-        long timeout = 3000; // Set a timeout of 3 seconds
+        long timeout = 2000; // Set a timeout of 3 seconds
 
         while (System.currentTimeMillis() - startTime < timeout) {
             if (client.getReceivedMessage() != null) {
@@ -162,5 +162,6 @@ public class LoginGUI extends JFrame {
     }
 
 }
+
 
 

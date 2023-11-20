@@ -114,7 +114,7 @@ public class JoinGUI extends JFrame {
 
                     // 서버에서 응답 올때까지 좀만 기다리기
                     try {
-                        Thread.sleep(1000);
+                        Thread.sleep(500);
                     } catch (Exception e1) {
                         e1.printStackTrace();
                     }
@@ -171,7 +171,7 @@ public class JoinGUI extends JFrame {
 
                         // 서버에서 응답 올때까지 좀만 기다리기
                         try {
-                            Thread.sleep(1000);
+                            Thread.sleep(500);
                         } catch (Exception e1) {
                             e1.printStackTrace();
                         }
@@ -224,7 +224,7 @@ public class JoinGUI extends JFrame {
 
     private boolean waitForIDCheckResult() {
         long startTime = System.currentTimeMillis();
-        long timeout = 3000; // Set a timeout of 3 seconds
+        long timeout = 2000; // Set a timeout of 3 seconds
 
         // 3초동안 while문 돌며 서버로부터 답장 받음
         while (System.currentTimeMillis() - startTime < timeout) {
@@ -239,7 +239,7 @@ public class JoinGUI extends JFrame {
 
     private boolean waitForSignUpResult() {
         long startTime = System.currentTimeMillis();
-        long timeout = 3000; // Set a timeout of 3 seconds
+        long timeout = 2000; // Set a timeout of 3 seconds
 
         while (System.currentTimeMillis() - startTime < timeout) {
             if (client.getReceivedMessage() != null) {
@@ -252,6 +252,7 @@ public class JoinGUI extends JFrame {
 
 
 }
+
 
 
 

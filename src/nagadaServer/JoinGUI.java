@@ -21,9 +21,11 @@ public class JoinGUI extends JFrame {
     private JButton buttonBack;
 
     private String confirmID = "";
+    private Server server;
 
-    public JoinGUI() {
+    public JoinGUI(Server server) {
         super("관리자 회원가입 화면");
+        this.server = server;
 
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLayout(null); // No layout manager (null layout)
@@ -162,7 +164,7 @@ public class JoinGUI extends JFrame {
                                     "회원가입이 완료되었습니다."
                             );
                             JoinGUI.this.dispose();
-                            new LoginGUI();
+                            new LoginGUI(server);
                         } else {
                             JOptionPane.showMessageDialog(
                                     JoinGUI.this,
@@ -192,7 +194,7 @@ public class JoinGUI extends JFrame {
             @Override
             public void actionPerformed(ActionEvent e) {
                 JoinGUI.this.dispose();
-                new LoginGUI();
+                new LoginGUI(server);
             }
         });
     }
@@ -200,6 +202,7 @@ public class JoinGUI extends JFrame {
 
 
 }
+
 
 
 

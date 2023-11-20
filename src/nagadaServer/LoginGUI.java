@@ -11,9 +11,11 @@ public class LoginGUI extends JFrame {
     private JPasswordField textPW;
     private JButton buttonLogin;
     private JButton buttonSignUp;
+    private Server server;
 
-    public LoginGUI() {
+    public LoginGUI(Server server) {
         super("관리자 로그인 화면");
+        this.server = server;
 
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLayout(null);
@@ -104,8 +106,7 @@ public class LoginGUI extends JFrame {
                                 "로그인 성공"
                         );
                         setVisible(false);
-                        ServerGUI serverGUI = new ServerGUI();
-                        serverGUI.setVisible(true);
+                        server.onLoginSuccess();
                     } else {
                         JOptionPane.showMessageDialog(
                                 LoginGUI.this,
@@ -128,7 +129,7 @@ public class LoginGUI extends JFrame {
             @Override
             public void actionPerformed(ActionEvent e) {
                 setVisible(false);
-                JoinGUI joinGUI = new JoinGUI();
+                JoinGUI joinGUI = new JoinGUI(server);
                 joinGUI.setVisible(true);
             }
         });
@@ -136,4 +137,5 @@ public class LoginGUI extends JFrame {
 
 
 }
+
 
