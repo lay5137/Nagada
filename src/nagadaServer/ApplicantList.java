@@ -4,6 +4,47 @@ import java.awt.*;
 import javax.swing.*;
 import javax.swing.border.LineBorder;
 import javax.swing.border.TitledBorder;
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.FocusEvent;
+import java.awt.event.FocusListener;
+
+class HintTextField extends JTextField implements FocusListener {
+    private final String hint;
+    private boolean showingHint;
+
+    public HintTextField(String hint) {
+        super();
+        this.hint = hint;
+        this.showingHint = true;
+        this.setForeground(Color.GRAY);
+        this.setText(hint);
+        this.addFocusListener(this);
+    }
+
+    @Override
+    public void focusGained(FocusEvent e) {
+        if (this.getText().isEmpty()) {
+            super.setText("");
+            this.setForeground(Color.BLACK);
+            showingHint = false;
+        }
+    }
+
+    @Override
+    public void focusLost(FocusEvent e) {
+        if (this.getText().isEmpty()) {
+            super.setText(hint);
+            this.setForeground(Color.GRAY);
+            showingHint = true;
+        }
+    }
+
+    @Override
+    public String getText() {
+        return showingHint ? "" : super.getText();
+    }
+}
 
 public class ApplicantList extends JFrame {
 
@@ -29,18 +70,14 @@ public class ApplicantList extends JFrame {
 
         JLabel space1 = new JLabel("       ");
 
-        JTextField minPeople = new JTextField();
+        HintTextField minPeople = new HintTextField("최소인원");
         minPeople.setPreferredSize(new Dimension(80, 30));
-        minPeople.setText("최소인원");
-        minPeople.setEnabled(false);
 
         JLabel wave = new JLabel("   ~");
         wave.setPreferredSize(new Dimension(30, 30));
 
-        JTextField maxPeople = new JTextField();
+        HintTextField maxPeople = new HintTextField("최대인원");
         maxPeople.setPreferredSize(new Dimension(80, 30));
-        maxPeople.setText("최대인원");
-        maxPeople.setEnabled(false);
 
         panel1.add(dateLabel);
         panel1.add(space1);
