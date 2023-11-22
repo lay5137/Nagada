@@ -47,6 +47,7 @@ public class ApplicantList extends JFrame {
 
         JTable table = new JTable(100, 8);
         JScrollPane sp = new JScrollPane(table);
+        sp.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5)); // Add padding to the JScrollPane
         table.setFillsViewportHeight(true);
         Dimension d = table.getPreferredSize();
         d.width = 200;
@@ -54,10 +55,16 @@ public class ApplicantList extends JFrame {
         sp.setPreferredSize(d);
 
         JButton acceptBt = new JButton("확정");
+        JButton modifyBt = new JButton("수정"); // Added "수정" button
 
         panel3.add(noticeBound, BorderLayout.NORTH);
         panel3.add(sp, BorderLayout.CENTER);
-        panel3.add(acceptBt, BorderLayout.SOUTH);
+
+        JPanel buttonPanel = new JPanel();
+        buttonPanel.add(acceptBt);
+        buttonPanel.add(modifyBt);
+
+        panel3.add(buttonPanel, BorderLayout.SOUTH);
 
         JPanel containerPanel = new JPanel();
         containerPanel.setLayout(new BoxLayout(containerPanel, BoxLayout.Y_AXIS));
@@ -70,7 +77,6 @@ public class ApplicantList extends JFrame {
         setVisible(true);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
     }
-
 
     public static void main(String[] args) {
         new ApplicantList();
