@@ -178,7 +178,8 @@ public class ServerGUI extends JFrame {
         button.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-
+                // Create and show the ApplicantList frame
+                new ApplicantList(dateLabels[index]).setVisible(true);
             }
         });
 
