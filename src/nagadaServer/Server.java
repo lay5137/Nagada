@@ -252,7 +252,4 @@ public class Server {
         System.out.println("현재 인원 : " + childList.size() + "명");
     }
 
-
-
-
 }

@@ -6,6 +6,7 @@ import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.net.Socket;
+import java.sql.*;
 
 public class ChildThread implements Runnable {
 
@@ -22,6 +23,14 @@ public class ChildThread implements Runnable {
     // 로그인 성공 시 미리 저장해둠
     String userID;
 
+    Connection con = null;
+    Statement stmt = null;
+    String url = "jdbc:mysql://localhost:3306/Nagada?serverTimezone=UTC";
+    String user = "root";
+    String passwd = "1234";
+    PreparedStatement ps;
+    ResultSet rs;
+
     // 생성자
     public ChildThread(Socket socket, Server server) {
         childSocket = socket;	// 클라이언트와 통신할 수 있는 소켓 정보를 childSocket에 저장
@@ -36,6 +45,17 @@ public class ChildThread implements Runnable {
             e.printStackTrace();
         }
 
+        // MYSQL과 연동
+        try {
+            Class.forName("com.mysql.cj.jdbc.Driver");
+            con = DriverManager.getConnection(url, user, passwd);
+            stmt = con.createStatement();
+            System.out.println("MySQL 서버 연동 성공");
+        } catch(ClassNotFoundException e) {
+            System.out.println("JDBC 드라이버 로드 오류");
+        } catch(SQLException e) {
+            System.out.println("DB 연결 오류");
+        }
     }
 
 
@@ -108,8 +128,9 @@ public class ChildThread implements Runnable {
         }
         String id = parts[1];
         String pw = parts[2];
-        // TODO: 데이터베이스 로그인 검증 로직 구현
-        boolean loginSuccessful = true; // 임시로 항상 성공으로 설정
+
+        //TODO: DB 구현
+        boolean loginSuccessful = logincheck(id, pw); // 임시로 항상 성공으로 설정
         if (loginSuccessful) {
             sendMessage("LOGIN_SUCCESS");
             userID = parts[1];
@@ -126,7 +147,7 @@ public class ChildThread implements Runnable {
         }
         String id = parts[1];
         // TODO: 데이터베이스 ID 중복 검사 로직 구현
-        boolean idAvailable = true; // 임시로 항상 사용 가능으로 설정
+        boolean idAvailable = getIdByCheck(id); // 임시로 항상 사용 가능으로 설정
         if (idAvailable) {
             sendMessage("ID_AVAILABLE");
         } else {
@@ -149,7 +170,7 @@ public class ChildThread implements Runnable {
         String acc = parts[7];
         String bank = parts[8];
         // TODO: 회원가입 로직 구현
-        boolean isFinishSignup = true; // 임시로 항상 성공으로 설정
+        boolean isFinishSignup = joinCheck(id, pw, name, gender, age, phone, acc, bank); // 임시로 항상 성공으로 설정
         if (isFinishSignup) {
             sendMessage("SIGNUP_SUCCESS");
         } else {
@@ -190,9 +211,82 @@ public class ChildThread implements Runnable {
         return userID;
     }
 
+    //로그인 DB
+    boolean logincheck(String _i, String _p) {
+        boolean flag = false;
+
+        String id = _i;
+        String pw = _p;
+
+        try {
+            String checkingStr = "SELECT pw FROM Client WHERE ID='" + id + "'";
+            ResultSet result = stmt.executeQuery(checkingStr);
+
+            int count = 0;
+            while(result.next()) {
+                if(pw.equals(result.getString("pw"))) {
+                    flag = true;
+                    System.out.println("로그인 성공");
+                }
+
+                else {
+                    flag = false;
+                    System.out.println("로그인 실패");
+                }
+                count++;
+            }
+        } catch(Exception e) {
+            flag = false;
+            System.out.println("로그인 실패 > " + e.toString());
+        }
+
+        return flag;
+    }
+
+    //회원가입 DB
+    boolean joinCheck(String _i, String _p, String _n, String _g, String _a, String _ph, String _ac, String _b) {
+        boolean flag = false;
+
+        String id = _i;
+        String pw = _p;
+        String nm = _n;
+        String gd = _g;
+        String ag = _a;
+        String ph = _ph;
+        String ac = _ac;
+        String bk = _b;
+
+        try {
+            String insertStr = "INSERT INTO Client VALUES('" + id + "', '" + pw + "' , '" + nm + "', '" + gd + "', '" + ag + "', '" + ph + "', '" + ac + "', '" + bk + "')";
+            stmt.executeUpdate(insertStr);
+
+            flag = true;
+            System.out.println("회원가입 성공");
+        } catch(Exception e) {
+            flag = false;
+            System.out.println("회원가입 실패 > " + e.toString());
+        }
+
+        return flag;
+    }
+
+    //아이디 중복 확인 DB
+    public boolean getIdByCheck(String id) {
+        boolean result = true;
+
+        try {
+            ps = con.prepareStatement("SELECT * FROM Client WHERE ID=?");
+            ps.setString(1, id.trim());
+            rs = ps.executeQuery(); //실행
+            if (rs.next())
+                result = false; //레코드가 존재하면 false
+
+        } catch (SQLException e) {
+            System.out.println(e + "=>  getIdByCheck fail");
+        }
+
+        return result;
+
+    }
 
 }
-
-
-
-

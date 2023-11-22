@@ -4,6 +4,10 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.Statement;
 
 public class JoinGUI extends JFrame {
 
@@ -23,6 +27,13 @@ public class JoinGUI extends JFrame {
     private String confirmID = "";
     private Server server;
 
+    Connection con = null;
+    Statement stmt = null;
+    String url = "jdbc:mysql://localhost:3306/Nagada?serverTimezone=UTC";
+    String user = "root";
+    String passwd = "1234";
+    PreparedStatement ps;
+    ResultSet rs;
     public JoinGUI(Server server) {
         super("관리자 회원가입 화면");
         this.server = server;
@@ -154,7 +165,7 @@ public class JoinGUI extends JFrame {
 
                     if(confirmID.equals(textID.getText())) {
 
-                        // 데이터베이스에 저장 제대로 저장되면 true 아니면 false
+
 
                         boolean isSignUpFinish = true;
 
@@ -199,7 +210,31 @@ public class JoinGUI extends JFrame {
         });
     }
 
+    boolean joinCheck(String _i, String _p, String _n, String _g, String _a, String _ph, String _ac, String _b) {
+        boolean flag = false;
 
+        String id = _i;
+        String pw = _p;
+        String nm = _n;
+        String gd = _g;
+        String ag = _a;
+        String ph = _ph;
+        String ac = _ac;
+        String bk = _b;
+
+        try {
+            String insertStr = "INSERT INTO Client VALUES('" + id + "', '" + pw + "' , '" + nm + "', '" + gd + "', '" + ag + "', '" + ph + "', '" + ac + "', '" + bk + "')";
+            stmt.executeUpdate(insertStr);
+
+            flag = true;
+            System.out.println("회원가입 성공");
+        } catch(Exception e) {
+            flag = false;
+            System.out.println("회원가입 실패 > " + e.toString());
+        }
+
+        return flag;
+    }
 
 }
 
