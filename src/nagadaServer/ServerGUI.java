@@ -148,12 +148,13 @@ public class ServerGUI extends JFrame {
             String dayOfWeek = new SimpleDateFormat("E").format(calendar.getTime());
 
             // UI에 표시될 날짜와 요일 (HTML 형식)
-            String formattedDate = String.format("<html><div style='text-align: center;'>%02d/%02d<br/><br/>%s</div></html>", month, day, dayOfWeek);
+            String formattedDate = String.format("<html><div style='text-align: center;'>%02d/%02d %s</div></html>", month, day, dayOfWeek);
             dateLabels[i] = formattedDate;
 
             calendar.add(Calendar.DATE, 1);
         }
     }
+
 
     private JLabel createLabel(String text, int fontSize, int x, int y, int width, int height) {
         JLabel label = new JLabel(text, SwingConstants.CENTER);
@@ -213,7 +214,4 @@ public class ServerGUI extends JFrame {
         }
     }
 
-
 }
-
-
