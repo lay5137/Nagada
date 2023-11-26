@@ -2,6 +2,12 @@ package nagadaServer;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -32,6 +38,15 @@ public class Server {
     private Map<String, Integer> nightApplicantCounts = new HashMap<>();
 
     private ServerGUI serverGUI;
+
+    Connection conn;
+    String url = "jdbc:mysql://localhost:3306/nagada?serverTimezone=UTC";
+
+    String databaseID = "root";
+    String databasePW = "1234";
+
+    Statement stmt;
+    ResultSet result;
 
     // 생성자
     public Server() {
@@ -105,7 +120,7 @@ public class Server {
     private String generateStatusMessageForUser(String userId) {
         StringBuilder statusMessage = new StringBuilder();
         LocalDate today = LocalDate.now(); // Get today's date
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MM/dd");
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy/MM/dd");
 
         // Append today's date as the starting date of the status message
         statusMessage.append(today.format(formatter));
@@ -127,18 +142,18 @@ public class Server {
         Map<String, List<String>> applicantNames = (period.equals("day")) ? dayApplicantNames : nightApplicantNames;
         String dayKey = getDayKey(dayIndex); // 날짜 키 생성
 
-        // 해당 날짜의 명단 가져오기
+        // 해당 날짜에 지원한 사람들이 누구인지
         List<String> applicants = applicantNames.getOrDefault(dayKey, new ArrayList<>());
-        System.out.println(applicants);
+        System.out.print(applicants);
 
-        // 명단 정렬 (필요한 경우)
+        // 명단 정렬 (필요한 경우, 쓸지는 모르겠다)
         //sortApplicantList(applicantNames, dayKey);
 
         int position = applicants.indexOf(userId);
         System.out.print(position);
 
         // 사용자의 상태 결정
-        if (position == 0) {
+        if (position == 0) {	// -1이 아예없느 상태 0~순서
             return "가확정";
         } else if (position == 1) {
             return "예비";
@@ -150,14 +165,8 @@ public class Server {
     private String getDayKey(int dayIndex) {
         LocalDate today = LocalDate.now();
         LocalDate targetDate = today.plusDays(dayIndex);
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MM/dd");
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy/MM/dd");
         return targetDate.format(formatter);
-    }
-
-    private void sortApplicantList(Map<String, List<String>> applicantNames, String dayKey) {
-        // Implement the sorting logic here
-        // This might involve ordering the applicants based on application time or other criteria
-        // Example: Collections.sort(applicantNames.get(dayKey), yourComparator);
     }
 
     public void updateAllClientsWithPersonalizedStatus() {
@@ -182,10 +191,6 @@ public class Server {
 
     // 지원자 정보를 처리하는 메소드
     public void processAddApplication(String period, String date, String userId) {
-        // 데이터베이스에서 사용자 정보를 조회
-        // DB 접근 코드를 여기에 구현합니다. 예를 들어,
-        String userInfo = queryUserInfoFromDB(userId); // 가정된 데이터베이스 조회 결과
-
         // 명단에 지원자 추가 및 지원자 수 증가는 동기화된 블록 내에서 수행
         synchronized (this) {
             List<String> applicantNames;
@@ -199,7 +204,7 @@ public class Server {
                 applicantCounts = nightApplicantCounts;
             }
 
-            applicantNames.add(userInfo);	// 명단 넣는 코드 명단이 정렬되어야 함
+            applicantNames.add(userId);	// 명단 넣는 코드 명단이 정렬되어야 함
             int newCount = applicantCounts.getOrDefault(date, 0) + 1;
             applicantCounts.put(date, newCount);
 
@@ -209,11 +214,31 @@ public class Server {
     }
 
 
-    // 데이터베이스에서 사용자 정보를 조회하는 메소드 (가정)
-    private String queryUserInfoFromDB(String userId) {
-        // 실제 데이터베이스 접근 코드는 여기에 구현해야 합니다.
-        // 아래는 예시로 사용자 정보를 가정하여 반환합니다.
-        return userId; // 유저 ID만 저장 나머지는 보여지기만 하면 되게끔
+    // 지원 취소 처리 메소드
+    public void processDeleteApplication(String period, String date, String userId) {
+        synchronized (this) {
+            List<String> applicantNames;
+            Map<String, Integer> applicantCounts;
+
+            if ("주간".equals(period)) {
+                applicantNames = dayApplicantNames.getOrDefault(date, new ArrayList<>());
+                applicantCounts = dayApplicantCounts;
+            } else {
+                applicantNames = nightApplicantNames.getOrDefault(date, new ArrayList<>());
+                applicantCounts = nightApplicantCounts;
+            }
+
+            // 지원자 명단에서 사용자 ID 제거
+            applicantNames.remove(userId);
+
+            // 지원자 수 감소
+            int newCount = applicantCounts.getOrDefault(date, 0) - 1;
+            newCount = Math.max(newCount, 0); // 음수가 되지 않도록 보장
+            applicantCounts.put(date, newCount);
+
+            // GUI 업데이트
+            updateApplicantNumbers(date, period, newCount);
+        }
     }
 
 
@@ -224,6 +249,69 @@ public class Server {
         serverGUI.updateApplicantNumbers(dayApplicantCounts, nightApplicantCounts);
         serverGUI.updatePanels();
     }
+
+
+    // 상세보기 기능을 위한 메서드
+    public void showApplicantDetails(String date, String period) {
+        List<String> applicantIds = getApplicantIds(date, period);
+        List<Applicant> detailsList = getApplicant(applicantIds);
+
+        // ServerGUI의 updateApplicantTable 메서드를 호출하여 지원자 정보를 표시합니다.
+        serverGUI.updateApplicantTable(detailsList, date, period);
+    }
+
+    // 해당 날짜와 주야간에 따른 userId 목록을 가져오는 메서드
+    private List<String> getApplicantIds(String date, String period) {
+        Map<String, List<String>> applicantMap = period.equals("주간") ? dayApplicantNames : nightApplicantNames;
+        return applicantMap.getOrDefault(date, new ArrayList<>());
+    }
+
+    // 데이터베이스에서 userId에 해당하는 상세 정보를 가져오는 메서드
+    private List<Applicant> getApplicant(List<String> userIds) {
+        List<Applicant> detailsList = new ArrayList<>();
+        Connection conn = null;
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
+
+        try {
+            Class.forName("com.mysql.cj.jdbc.Driver");
+            conn = DriverManager.getConnection(url, databaseID, databasePW);
+            System.out.println("DB연결완료");
+
+            // 각 userId에 대해 정보 검색
+            for (String userId : userIds) {
+                String query = "SELECT name, age, gender, phone FROM user WHERE id = ?";
+                pstmt = conn.prepareStatement(query);
+                pstmt.setString(1, userId);
+                rs = pstmt.executeQuery();
+
+                if (rs.next()) {
+                    String name = rs.getString("name");
+                    String age = rs.getString("age");
+                    String gender = rs.getString("gender");
+                    String phone = rs.getString("phone");
+
+                    detailsList.add(new Applicant(userId, name, age, gender, phone));
+                }
+            }
+        } catch (ClassNotFoundException e) {
+            System.out.println("JDBC 드라이버 로드 오류");
+        } catch (SQLException e) {
+            System.out.println("DB 연결 오류");
+            e.printStackTrace();
+        } finally {
+            try {
+                if (rs != null) rs.close();
+                if (pstmt != null) pstmt.close();
+                if (conn != null) conn.close();
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
+        }
+
+        return detailsList;
+    }
+
 
 
     // 모든 클라이언트에게 내용 전달
@@ -251,5 +339,8 @@ public class Server {
         System.out.println(childSocket.getInetAddress() + "님이 접속");
         System.out.println("현재 인원 : " + childList.size() + "명");
     }
+
+
+
 
 }

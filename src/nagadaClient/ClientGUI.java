@@ -140,12 +140,14 @@ class MySchedulePanel extends JPanel {
 
 
 
-class ApplyPanel extends JPanel {
+class ApplyPanel extends JPanel {	// 패널 업데이트 될때 신청 버튼이 초기화되서 다시 눌린다 해결해야함
 
     private String[] dateLabels = new String[7];
     private String[] simpleDateLabels = new String[7]; // 서버에 보낼 간단한 날짜 형식
     private String[] statusLabelsDay = new String[7]; // 주간 상태 배열
     private String[] statusLabelsNight = new String[7]; // 야간 상태 배열
+    private boolean[] hasAppliedDay = new boolean[7];  // 주간 신청 여부
+    private boolean[] hasAppliedNight = new boolean[7]; // 야간 신청 여부
 
     private JPanel dayTimePanel;
     private JPanel nightTimePanel;
@@ -156,14 +158,18 @@ class ApplyPanel extends JPanel {
     private Calendar lastUpdated = Calendar.getInstance();
     private Timer updateTimer;    // 타이머 객체 생성
 
+    private CancelPanel cancelPanel; // ApplyPanel의 참조를 저장
+
     public ApplyPanel(Client client) {
         this.client = client;
         setLayout(null);
 
         updateDateLabels(); // 초기에 날짜 레이블 업데이트
         for(int i = 0; i < 7; i++) {
-            statusLabelsDay[i] = "주간" + i;
-            statusLabelsNight[i] = "야간" + i;
+            statusLabelsDay[i] = " ";
+            statusLabelsNight[i] = " ";
+            hasAppliedDay[i] = false;
+            hasAppliedNight[i] = false;
         }
 
         // 날짜 라벨 위치 계산
@@ -184,8 +190,8 @@ class ApplyPanel extends JPanel {
         add(nightTimePanel);
 
         // 위에는 GUI 생성할 때, 한번만 호출되기 때문에 이 부분에서 계속 반복적으로 작업하며 업데이트 진행
-        // 타이머 설정: 10마다 체크
-        updateTimer = new Timer(10000, new ActionListener() {
+        // 타이머 설정: 1초마다 체크
+        updateTimer = new Timer(1000, new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
                 // 새로운 날이 시작되면 날짜 라벨 업데이트
@@ -209,6 +215,10 @@ class ApplyPanel extends JPanel {
         });
         updateTimer.start(); // 타이머 시작
 
+    }
+
+    public void setCancelPanel(CancelPanel cancelPanel) {
+        this.cancelPanel = cancelPanel;
     }
 
 
@@ -291,6 +301,7 @@ class ApplyPanel extends JPanel {
     private void updateDateLabels() {
         calendar = Calendar.getInstance();
         for (int i = 0; i < 7; i++) {
+            int year = calendar.get(Calendar.YEAR);
             int month = calendar.get(Calendar.MONTH) + 1;
             int day = calendar.get(Calendar.DAY_OF_MONTH);
             String dayOfWeek = new SimpleDateFormat("E").format(calendar.getTime());
@@ -300,7 +311,7 @@ class ApplyPanel extends JPanel {
             dateLabels[i] = formattedDate;
 
             // 서버에 보낼 간단한 날짜 형식
-            simpleDateLabels[i] = String.format("%02d/%02d", month, day);
+            simpleDateLabels[i] = String.format("%04d/%02d/%02d", year, month, day);
 
             calendar.add(Calendar.DATE, 1);
         }
@@ -318,33 +329,47 @@ class ApplyPanel extends JPanel {
     }
 
     private JButton createButton(String text, int x, int y, int width, int height, int index, String dayOrNight) {
-        JButton button = new JButton(text);
+        boolean hasApplied = (dayOrNight.equals("주간")) ? hasAppliedDay[index] : hasAppliedNight[index];
+        String buttonText = hasApplied ? "신청완료" : "신청";
+        JButton button = new JButton(buttonText);
+
         button.setBounds(x, y, width, height);
-        button.setBackground(new Color(225, 225, 225)); // 버튼 배경색 변경
-        button.setForeground(Color.DARK_GRAY); // 버튼 글자색 변경
-        button.setFocusPainted(false); // 버튼 포커스 테두리 제거
-        button.setBorder(BorderFactory.createLineBorder(Color.GRAY)); // 버튼 경계선 색 변경
-        button.setActionCommand(dayOrNight); // 주간 또는 야간 태그 설정
+        button.setBackground(new Color(225, 225, 225));
+        button.setForeground(Color.DARK_GRAY);
+        button.setFocusPainted(false);
+        button.setBorder(BorderFactory.createLineBorder(Color.GRAY));
+        button.setActionCommand(dayOrNight);
+        button.setEnabled(!hasApplied);
 
         button.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                String applyMessage = "APPLY|" + e.getActionCommand() + "|" + simpleDateLabels[index];
-                client.sendMessage(applyMessage);
+                if (!hasApplied) {
+                    String applyMessage = "APPLY|" + e.getActionCommand() + "|" + simpleDateLabels[index];
+                    client.sendMessage(applyMessage);
 
-                Timer responseTimer = new Timer(500, new ActionListener() {
-                    @Override
-                    public void actionPerformed(ActionEvent evt) {
-                        String response = client.getReceivedMessage();
-                        if (response != null && response.equals("APPLY_SUCCESS")) {
-                            button.setText("신청완료");
-                            button.setEnabled(false);
-                            ((Timer) evt.getSource()).stop(); // Stop the timer
+                    Timer responseTimer = new Timer(500, new ActionListener() {
+                        @Override
+                        public void actionPerformed(ActionEvent evt) {
+                            String response = client.getReceivedMessage();
+                            if (response != null && response.equals("APPLY_SUCCESS")) {
+                                button.setText("신청완료");
+                                button.setEnabled(false);
+                                cancelPanel.activateCancelButton(response, index, dayOrNight);
+
+                                // 신청 상태 배열 업데이트
+                                if(dayOrNight.equals("주간")) {
+                                    hasAppliedDay[index] = true;
+                                } else {
+                                    hasAppliedNight[index] = true;
+                                }
+                                ((Timer) evt.getSource()).stop();
+                            }
                         }
-                    }
-                });
-                responseTimer.setRepeats(true);
-                responseTimer.start();
+                    });
+                    responseTimer.setRepeats(true);
+                    responseTimer.start();
+                }
             }
         });
 
@@ -361,6 +386,18 @@ class ApplyPanel extends JPanel {
     }
 
 
+    public void activateApplyButton(String response, int index, String dayOrNight) {
+        if (response.equals("CANCEL_SUCCESS")) {
+            if (dayOrNight.equals("주간")) {
+                hasAppliedDay[index] = false;
+            } else {
+                hasAppliedNight[index] = false;
+            }
+            updatePanels(); // 업데이트된 상태로 패널을 다시 그립니다.
+        }
+    }
+
+
 }
 
 
@@ -373,6 +410,8 @@ class CancelPanel extends JPanel {
     private String[] simpleDateLabels = new String[7]; // 서버에 보낼 간단한 날짜 형식
     private String[] myStatusLabelsDay = new String[7]; // 주간 상태 배열
     private String[] myStatusLabelsNight = new String[7]; // 야간 상태 배열
+    private boolean[] hasAppliedDay = new boolean[7];  // 주간 취소 여부
+    private boolean[] hasAppliedNight = new boolean[7]; // 야간 취소 여부
 
     private final int spacing = 10; // 모든 요소들 사이의 간격
     private Client client;
@@ -383,15 +422,20 @@ class CancelPanel extends JPanel {
     private Calendar lastUpdated = Calendar.getInstance();
     private Timer updateTimer;    // 타이머 객체 생성
 
-    public CancelPanel(Client client) {
+    private ApplyPanel applyPanel; // ApplyPanel의 참조를 저장
+
+    public CancelPanel(Client client, ApplyPanel applyPanel) {
         this.client = client;
+        this.applyPanel = applyPanel;
         calendar = Calendar.getInstance(); // 오늘 날짜 설정
         setLayout(null);
 
         updateDateLabels(); // 초기에 날짜 레이블 업데이트
         for(int i = 0; i < 7; i++) {
-            myStatusLabelsDay[i] = "공백";
-            myStatusLabelsNight[i] = "공백";
+            myStatusLabelsDay[i] = " ";
+            myStatusLabelsNight[i] = " ";
+            hasAppliedDay[i] = false;
+            hasAppliedNight[i] = false;
         }
 
         // 날짜 라벨 위치 계산
@@ -411,7 +455,7 @@ class CancelPanel extends JPanel {
         setupDayOrNightPanel(nightTimePanel, "야간");
         add(nightTimePanel);
 
-        updateTimer = new Timer(10000, new ActionListener() {
+        updateTimer = new Timer(1000, new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
                 // 새로운 날이 시작되면 날짜 라벨 업데이트
@@ -513,7 +557,8 @@ class CancelPanel extends JPanel {
         calendar = Calendar.getInstance(); // Reset to current date
 
         for (int i = 0; i < 7; i++) {
-            int month = calendar.get(Calendar.MONTH) + 1;
+            int year = calendar.get(Calendar.YEAR); // 현재 calendar의 년도
+            int month = calendar.get(Calendar.MONTH) + 1; // 1월 = 0, 따라서 +1
             int day = calendar.get(Calendar.DAY_OF_MONTH);
             String dayOfWeek = new SimpleDateFormat("E").format(calendar.getTime());
 
@@ -522,9 +567,9 @@ class CancelPanel extends JPanel {
             dateLabels[i] = formattedDate;
 
             // 서버에 보낼 간단한 날짜 형식
-            simpleDateLabels[i] = String.format("%02d/%02d", month, day);
+            simpleDateLabels[i] = String.format("%04d/%02d/%02d", year, month, day);
 
-            calendar.add(Calendar.DATE, 1);
+            calendar.add(Calendar.DATE, 1); // 날짜를 하루 증가시킴
         }
     }
 
@@ -540,6 +585,8 @@ class CancelPanel extends JPanel {
     }
 
     private JButton createButton(String text, int x, int y, int width, int height, int index, String dayOrNight) {
+        boolean hasApplied = (dayOrNight.equals("주간")) ? hasAppliedDay[index] : hasAppliedNight[index];
+
         JButton button = new JButton(text);
         button.setBounds(x, y, width, height);
         button.setBackground(new Color(225, 225, 225)); // 버튼 배경색 변경
@@ -547,13 +594,35 @@ class CancelPanel extends JPanel {
         button.setFocusPainted(false); // 버튼 포커스 테두리 제거
         button.setBorder(BorderFactory.createLineBorder(Color.GRAY)); // 버튼 경계선 색 변경
         button.setActionCommand(dayOrNight); // 주간 또는 야간 태그 설정
+        button.setEnabled(hasApplied); // 버튼 활성화 상태 설정
 
         // 신청버튼 눌렀을 떄
         button.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                String applyMessage = "CANCEL|" + e.getActionCommand() + "|" + simpleDateLabels[index];
-                client.sendMessage(applyMessage);
+                String cancelMessage = "CANCEL|" + e.getActionCommand() + "|" + simpleDateLabels[index];
+                client.sendMessage(cancelMessage);
+
+                Timer responseTimer = new Timer(500, new ActionListener() {
+                    @Override
+                    public void actionPerformed(ActionEvent evt) {
+                        String response = client.getReceivedMessage();
+                        if (response != null && response.equals("CANCEL_SUCCESS")) {
+                            button.setEnabled(false);
+                            applyPanel.activateApplyButton(response, index, dayOrNight);
+
+                            // 다시 비활성화 상태로 바꿔주기
+                            if(dayOrNight.equals("주간")) {
+                                hasAppliedDay[index] = false;
+                            } else {
+                                hasAppliedNight[index] = false;
+                            }
+                            ((Timer) evt.getSource()).stop();
+                        }
+                    }
+                });
+                responseTimer.setRepeats(true);
+                responseTimer.start();
             }
         });
 
@@ -569,6 +638,19 @@ class CancelPanel extends JPanel {
         return panel;
     }
 
+
+    public void activateCancelButton(String response, int index, String dayOrNight) {
+        if (response.equals("APPLY_SUCCESS")) {
+            if (dayOrNight.equals("주간")) {
+                hasAppliedDay[index] = true;
+            } else {
+                hasAppliedNight[index] = true;
+            }
+            updatePanels();
+        }
+    }
+
+
 }
 
 
@@ -582,7 +664,8 @@ public class ClientGUI extends JFrame {
 
         MySchedulePanel mySchedulePanel = new MySchedulePanel(client);
         ApplyPanel applyPanel = new ApplyPanel(client);
-        CancelPanel cancelPanel = new CancelPanel(client);
+        CancelPanel cancelPanel = new CancelPanel(client, applyPanel);
+        applyPanel.setCancelPanel(cancelPanel);
 
         clientGUI.addTab("나의일정", mySchedulePanel);
         clientGUI.addTab("지원하기", applyPanel);

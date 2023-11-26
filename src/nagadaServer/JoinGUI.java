@@ -5,8 +5,10 @@ import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.sql.Connection;
+import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Statement;
 
 public class JoinGUI extends JFrame {
@@ -27,13 +29,15 @@ public class JoinGUI extends JFrame {
     private String confirmID = "";
     private Server server;
 
-    Connection con = null;
-    Statement stmt = null;
-    String url = "jdbc:mysql://localhost:3306/Nagada?serverTimezone=UTC";
-    String user = "root";
-    String passwd = "1234";
-    PreparedStatement ps;
-    ResultSet rs;
+    Connection conn;
+    String url = "jdbc:mysql://localhost:3306/nagada?serverTimezone=UTC";
+
+    String databaseID = "root";
+    String databasePW = "1234";
+
+    Statement stmt;
+    ResultSet result;
+
     public JoinGUI(Server server) {
         super("관리자 회원가입 화면");
         this.server = server;
@@ -118,32 +122,43 @@ public class JoinGUI extends JFrame {
                 String id = textID.getText();
 
                 if (!id.isEmpty()) {
+                    try {
+                        // JDBC 드라이버 로드 및 데이터베이스 연결
+                        Class.forName("com.mysql.cj.jdbc.Driver");
+                        conn = DriverManager.getConnection(url, databaseID, databasePW);
+                        System.out.println("DB연결완료");
 
-                    // 데이터베이스에서 ID중복확인 후 true인지 false인지
+                        // SQL 쿼리 실행
+                        stmt = conn.createStatement();
+                        String query = "SELECT COUNT(*) FROM user WHERE id = '" + id + "'";
+                        result = stmt.executeQuery(query);
 
-                    // Check for ID availability
-                    boolean isIDAvailable = true;
+                        boolean idAvailable = true;
+                        if (result.next() && result.getInt(1) > 0) {
+                            idAvailable = false; // ID가 데이터베이스에 이미 존재함
+                        }
 
-                    if (isIDAvailable) {
-                        JOptionPane.showMessageDialog(
-                                JoinGUI.this,
-                                "ID 사용 가능"
-                        );
-                        confirmID = id;
-                    } else {
-                        JOptionPane.showMessageDialog(
-                                JoinGUI.this,
-                                "ID 사용 불가"
-                        );
+                        // ID 사용 가능 여부에 따른 UI 피드백
+                        if (idAvailable) {
+                            JOptionPane.showMessageDialog(JoinGUI.this, "ID 사용 가능");
+                            confirmID = id;
+                        } else {
+                            JOptionPane.showMessageDialog(JoinGUI.this, "ID 사용 불가");
+                        }
+
+                        // 자원 해제
+                        result.close();
+                        stmt.close();
+                        conn.close();
+
+                    } catch (ClassNotFoundException ex) {
+                        System.out.println("JDBC 드라이버 로드 오류");
+                    } catch (SQLException ex) {
+                        System.out.println("DB 연결 오류");
                     }
+                } else {
+                    JOptionPane.showMessageDialog(JoinGUI.this, "ID 입력하세요");
                 }
-                else {
-                    JOptionPane.showMessageDialog(
-                            JoinGUI.this,
-                            "ID 입력하세요"
-                    );
-                }
-
             }
         });
 
@@ -161,39 +176,56 @@ public class JoinGUI extends JFrame {
                 String acc = textAcc.getText();
                 String bank = textBank.getText();
 
-                if(!id.isEmpty() && pw.length > 0 && !name.isEmpty() && !gender.isEmpty() && !age.isEmpty() && !phone.isEmpty() && !acc.isEmpty() && !bank.isEmpty()) {
+                if (!id.isEmpty() && pw.length > 0 && !name.isEmpty() && !gender.isEmpty() && !age.isEmpty() && !phone.isEmpty() && !acc.isEmpty() && !bank.isEmpty()) {
 
-                    if(confirmID.equals(textID.getText())) {
+                    if (confirmID.equals(id)) {
 
+                        try {
+                            Class.forName("com.mysql.cj.jdbc.Driver");
+                            conn = DriverManager.getConnection(url, databaseID, databasePW);
+                            System.out.println("DB연결완료");
 
+                            String query = "INSERT INTO user (id, pw, name, gender, age, phone, acc, bank, position) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                            try (PreparedStatement pstmt = conn.prepareStatement(query)) {
+                                pstmt.setString(1, id);
+                                pstmt.setString(2, new String(pw));
+                                pstmt.setString(3, name);
+                                pstmt.setString(4, gender);
+                                pstmt.setString(5, age);
+                                pstmt.setString(6, phone);
+                                pstmt.setString(7, acc);
+                                pstmt.setString(8, bank);
+                                pstmt.setString(9, "관리자");
+                                int result = pstmt.executeUpdate();
 
-                        boolean isSignUpFinish = true;
-
-                        if (isSignUpFinish) {
-                            JOptionPane.showMessageDialog(
-                                    JoinGUI.this,
-                                    "회원가입이 완료되었습니다."
-                            );
-                            JoinGUI.this.dispose();
-                            new LoginGUI(server);
-                        } else {
-                            JOptionPane.showMessageDialog(
-                                    JoinGUI.this,
-                                    "회원가입에 실패했습니다. 다시 시도해주세요."
-                            );
+                                if (result > 0) {
+                                    JOptionPane.showMessageDialog(JoinGUI.this, "회원가입이 완료되었습니다.");
+                                    JoinGUI.this.dispose();
+                                    new LoginGUI(server);
+                                } else {
+                                    JOptionPane.showMessageDialog(JoinGUI.this, "회원가입에 실패했습니다. 다시 시도해주세요.");
+                                }
+                            }
+                        } catch (ClassNotFoundException ex) {
+                            System.out.println("JDBC 드라이버 로드 오류");
+                            JOptionPane.showMessageDialog(JoinGUI.this, "회원가입에 실패했습니다. 드라이버 로드 오류");
+                        } catch (SQLException ex) {
+                            System.out.println("DB연결오류");
+                            JOptionPane.showMessageDialog(JoinGUI.this, "회원가입에 실패했습니다. 데이터베이스 오류");
+                        } finally {
+                            try {
+                                if (conn != null) conn.close();
+                            } catch (SQLException ex) {
+                                ex.printStackTrace();
+                            }
                         }
+
                     } else {
-                        JOptionPane.showMessageDialog(
-                                JoinGUI.this,
-                                "중복확인을 하지 않은 아이디입니다."
-                        );
+                        JOptionPane.showMessageDialog(JoinGUI.this, "중복확인을 하지 않은 아이디입니다.");
                     }
 
                 } else {
-                    JOptionPane.showMessageDialog(
-                            JoinGUI.this,
-                            "모든 칸을 채워주세요"
-                    );
+                    JOptionPane.showMessageDialog(JoinGUI.this, "모든 칸을 채워주세요");
                 }
 
             }
@@ -210,31 +242,7 @@ public class JoinGUI extends JFrame {
         });
     }
 
-    boolean joinCheck(String _i, String _p, String _n, String _g, String _a, String _ph, String _ac, String _b) {
-        boolean flag = false;
 
-        String id = _i;
-        String pw = _p;
-        String nm = _n;
-        String gd = _g;
-        String ag = _a;
-        String ph = _ph;
-        String ac = _ac;
-        String bk = _b;
-
-        try {
-            String insertStr = "INSERT INTO Client VALUES('" + id + "', '" + pw + "' , '" + nm + "', '" + gd + "', '" + ag + "', '" + ph + "', '" + ac + "', '" + bk + "')";
-            stmt.executeUpdate(insertStr);
-
-            flag = true;
-            System.out.println("회원가입 성공");
-        } catch(Exception e) {
-            flag = false;
-            System.out.println("회원가입 실패 > " + e.toString());
-        }
-
-        return flag;
-    }
 
 }
 

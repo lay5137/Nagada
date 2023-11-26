@@ -7,11 +7,13 @@ import java.awt.event.ActionListener;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Map;
+import java.util.List;
 
 
 public class ServerGUI extends JFrame {
 
     private String[] dateLabels = new String[7];
+    private String[] simpleDateLabels = new String[7];
     private String[] applicantNumLabelsDay = new String[7];
     private String[] applicantNumLabelsNight = new String[7];
 
@@ -57,7 +59,7 @@ public class ServerGUI extends JFrame {
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setVisible(true);
 
-        updateTimer = new Timer(10000, new ActionListener() {
+        updateTimer = new Timer(1000, new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
                 // 새로운 날이 시작되면 날짜 라벨 업데이트
@@ -107,7 +109,7 @@ public class ServerGUI extends JFrame {
 
             // 버튼 위치 계산 (dateLabel 아래)
             int buttonY = dateLabelY + dateLabelHeight + spacing;
-            JButton button = createButton("상세보기", xPosition, buttonY, labelWidth, elementHeight, i);
+            JButton button = createButton("상세보기", xPosition, buttonY, labelWidth, elementHeight, i, dayOrNightLabel);
             panel.add(button);
         }
     }
@@ -117,12 +119,12 @@ public class ServerGUI extends JFrame {
         remove(dayTimePanel);
         remove(nightTimePanel);
 
-        int dayTimePanelY = 90; // 예시 Y 좌표
+        int dayTimePanelY = 120; // 예시 Y 좌표
         dayTimePanel = createPanel(10, dayTimePanelY, 710, 270);
         setupDayOrNightPanel(dayTimePanel, "주간");
         add(dayTimePanel);
 
-        int nightTimePanelY = 400; // 예시 Y 좌표
+        int nightTimePanelY = 430; // 예시 Y 좌표
         nightTimePanel = createPanel(10, nightTimePanelY, 710, 270);
         setupDayOrNightPanel(nightTimePanel, "야간");
         add(nightTimePanel);
@@ -143,18 +145,19 @@ public class ServerGUI extends JFrame {
         Calendar calendar = Calendar.getInstance(); // Reset to current date
 
         for (int i = 0; i < 7; i++) {
+            int year = calendar.get(Calendar.YEAR);
             int month = calendar.get(Calendar.MONTH) + 1;
             int day = calendar.get(Calendar.DAY_OF_MONTH);
             String dayOfWeek = new SimpleDateFormat("E").format(calendar.getTime());
 
             // UI에 표시될 날짜와 요일 (HTML 형식)
-            String formattedDate = String.format("<html><div style='text-align: center;'>%02d/%02d %s</div></html>", month, day, dayOfWeek);
+            String formattedDate = String.format("<html><div style='text-align: center;'>%02d/%02d<br/><br/>%s</div></html>", month, day, dayOfWeek);
             dateLabels[i] = formattedDate;
+            simpleDateLabels[i] = String.format("%04d/%02d/%02d", year, month, day);
 
             calendar.add(Calendar.DATE, 1);
         }
     }
-
 
     private JLabel createLabel(String text, int fontSize, int x, int y, int width, int height) {
         JLabel label = new JLabel(text, SwingConstants.CENTER);
@@ -167,7 +170,7 @@ public class ServerGUI extends JFrame {
         return label;
     }
 
-    private JButton createButton(String text, int x, int y, int width, int height, int index) {
+    private JButton createButton(String text, int x, int y, int width, int height, int index, String period) {
         JButton button = new JButton(text);
         button.setBounds(x, y, width, height);
         button.setBackground(new Color(225, 225, 225)); // 버튼 배경색 변경
@@ -179,8 +182,7 @@ public class ServerGUI extends JFrame {
         button.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                // Create and show the ApplicantList frame
-                new ApplicantList(dateLabels[index]).setVisible(true);
+                server.showApplicantDetails(simpleDateLabels[index], period);
             }
         });
 
@@ -201,7 +203,7 @@ public class ServerGUI extends JFrame {
     // 날짜에 맞게 지원자 수를 업데이트하는 메소드
     public void updateApplicantNumbers(Map<String, Integer> dayApplicantCounts, Map<String, Integer> nightApplicantCounts) {
         Calendar calendar = Calendar.getInstance();
-        SimpleDateFormat sdf = new SimpleDateFormat("MM/dd");
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy/MM/dd");
         for (int i = 0; i < 7; i++) {
             String formattedDate = sdf.format(calendar.getTime());
             int dayCount = dayApplicantCounts.getOrDefault(formattedDate, 0);
@@ -214,4 +216,13 @@ public class ServerGUI extends JFrame {
         }
     }
 
+
+    public void updateApplicantTable(List<Applicant> applicants, String date, String period) {
+        // 새로운 ApplicantList 창을 생성하고, 지원자 정보로 채웁니다.
+        new ApplicantList(applicants, date, period).setVisible(true);
+    }
+
+
 }
+
+

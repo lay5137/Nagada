@@ -6,7 +6,12 @@ import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.net.Socket;
-import java.sql.*;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
 
 public class ChildThread implements Runnable {
 
@@ -23,13 +28,14 @@ public class ChildThread implements Runnable {
     // 로그인 성공 시 미리 저장해둠
     String userID;
 
-    Connection con = null;
-    Statement stmt = null;
-    String url = "jdbc:mysql://localhost:3306/Nagada?serverTimezone=UTC";
-    String user = "root";
-    String passwd = "1234";
-    PreparedStatement ps;
-    ResultSet rs;
+    Connection conn;
+    String url = "jdbc:mysql://localhost:3306/nagada?serverTimezone=UTC";
+
+    String databaseID = "root";
+    String databasePW = "1234";
+
+    Statement stmt;
+    ResultSet result;
 
     // 생성자
     public ChildThread(Socket socket, Server server) {
@@ -45,17 +51,6 @@ public class ChildThread implements Runnable {
             e.printStackTrace();
         }
 
-        // MYSQL과 연동
-        try {
-            Class.forName("com.mysql.cj.jdbc.Driver");
-            con = DriverManager.getConnection(url, user, passwd);
-            stmt = con.createStatement();
-            System.out.println("MySQL 서버 연동 성공");
-        } catch(ClassNotFoundException e) {
-            System.out.println("JDBC 드라이버 로드 오류");
-        } catch(SQLException e) {
-            System.out.println("DB 연결 오류");
-        }
     }
 
 
@@ -126,17 +121,43 @@ public class ChildThread implements Runnable {
             sendMessage("LOGIN_FAIL|Invalid message format");
             return;
         }
-        String id = parts[1];
-        String pw = parts[2];
+        String clientID = parts[1];
+        String clientPW = parts[2];
 
-        //TODO: DB 구현
-        boolean loginSuccessful = logincheck(id, pw); // 임시로 항상 성공으로 설정
-        if (loginSuccessful) {
-            sendMessage("LOGIN_SUCCESS");
-            userID = parts[1];
-        } else {
-            sendMessage("LOGIN_FAIL");
+        try {
+            Class.forName("com.mysql.cj.jdbc.Driver");
+            conn = DriverManager.getConnection(url, databaseID, databasePW);
+            System.out.println("DB연결완료");
+
+            stmt = conn.createStatement();
+            String query = "SELECT * FROM user WHERE id = '" + clientID + "' AND pw = '" + clientPW + "' AND position = '사용자'";
+            result = stmt.executeQuery(query);
+
+            boolean loginSuccessful = false;
+            if (result.next()) {
+                loginSuccessful = true; // 사용자가 테이블에 존재하는 경우
+                userID = clientID;      // 로그인 성공한 사용자 ID 저장
+                System.out.println("USER_LOGIN_SUCCESS");
+            } else {
+                System.out.println("USER_LOGIN_FAIL");
+            }
+
+            if (loginSuccessful) {
+                sendMessage("LOGIN_SUCCESS");
+            } else {
+                sendMessage("LOGIN_FAIL");
+            }
+
+            result.close();
+            stmt.close();
+            conn.close();
+
+        } catch (ClassNotFoundException e) {
+            System.out.println("JDBC 드라이버 로드 오류");
+        } catch (SQLException e) {
+            System.out.println("DB연결오류");
         }
+
     }
 
 
@@ -145,14 +166,38 @@ public class ChildThread implements Runnable {
             sendMessage("ID_CHECK_FAIL|Invalid message format");
             return;
         }
-        String id = parts[1];
-        // TODO: 데이터베이스 ID 중복 검사 로직 구현
-        boolean idAvailable = getIdByCheck(id); // 임시로 항상 사용 가능으로 설정
-        if (idAvailable) {
-            sendMessage("ID_AVAILABLE");
-        } else {
-            sendMessage("ID_UNAVAILABLE");
+        String clientID = parts[1];
+
+        try {
+            Class.forName("com.mysql.cj.jdbc.Driver");
+            conn = DriverManager.getConnection(url, databaseID, databasePW);
+            System.out.println("DB연결완료");
+
+            stmt = conn.createStatement();
+            String query = "SELECT COUNT(*) FROM user WHERE id = '" + clientID + "'";
+            result = stmt.executeQuery(query);
+
+            boolean idAvailable = true;
+            if (result.next() && result.getInt(1) > 0) {
+                idAvailable = false; // ID가 데이터베이스에 이미 존재함
+            }
+
+            if (idAvailable) {
+                sendMessage("ID_AVAILABLE");
+            } else {
+                sendMessage("ID_UNAVAILABLE");
+            }
+
+            result.close();
+            stmt.close();
+            conn.close();
+
+        } catch (ClassNotFoundException e) {
+            System.out.println("JDBC 드라이버 로드 오류");
+        } catch (SQLException e) {
+            System.out.println("DB 연결 오류");
         }
+
     }
 
 
@@ -161,20 +206,51 @@ public class ChildThread implements Runnable {
             sendMessage("SIGNUP_FAIL|Invalid message format");
             return;
         }
-        String id = parts[1];
-        String pw = parts[2];
-        String name = parts[3];
-        String gender = parts[4];
-        String age = parts[5];
-        String phone = parts[6];
-        String acc = parts[7];
-        String bank = parts[8];
-        // TODO: 회원가입 로직 구현
-        boolean isFinishSignup = joinCheck(id, pw, name, gender, age, phone, acc, bank); // 임시로 항상 성공으로 설정
-        if (isFinishSignup) {
-            sendMessage("SIGNUP_SUCCESS");
-        } else {
-            sendMessage("SIGNUP_FAIL");
+        String clientID = parts[1];
+        String clientPW = parts[2];
+        String clientName = parts[3];
+        String clientGender = parts[4];
+        String clientAge = parts[5];
+        String clientPhone = parts[6];
+        String clientAcc = parts[7];
+        String clientBank = parts[8];
+
+        try {
+            Class.forName("com.mysql.cj.jdbc.Driver");
+            conn = DriverManager.getConnection(url, databaseID, databasePW);
+            System.out.println("DB연결완료");
+
+            String query = "INSERT INTO user (id, pw, name, gender, age, phone, acc, bank, position) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            try (PreparedStatement pstmt = conn.prepareStatement(query)) {
+                pstmt.setString(1, clientID);
+                pstmt.setString(2, clientPW);
+                pstmt.setString(3, clientName);
+                pstmt.setString(4, clientGender);
+                pstmt.setString(5, clientAge);
+                pstmt.setString(6, clientPhone);
+                pstmt.setString(7, clientAcc);
+                pstmt.setString(8, clientBank);
+                pstmt.setString(9, "사용자");
+                int result = pstmt.executeUpdate();
+
+                if (result > 0) {
+                    sendMessage("SIGNUP_SUCCESS");
+                } else {
+                    sendMessage("SIGNUP_FAIL");
+                }
+            }
+        } catch (ClassNotFoundException e) {
+            System.out.println("JDBC 드라이버 로드 오류");
+            sendMessage("SIGNUP_FAIL|Driver load error");
+        } catch (SQLException e) {
+            System.out.println("DB 연결 오류");
+            sendMessage("SIGNUP_FAIL|Database error");
+        } finally {
+            try {
+                if (conn != null) conn.close();
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
         }
     }
 
@@ -199,7 +275,7 @@ public class ChildThread implements Runnable {
         }
         String dayTime = parts[1]; // "주간" 또는 "야간"
         String date = parts[2];  // 날짜
-        // TODO: 지원 로직 구현
+        server.processDeleteApplication(dayTime, date, userID);
         String response = "CANCEL_SUCCESS";
         sendMessage(response);
     }
@@ -211,82 +287,9 @@ public class ChildThread implements Runnable {
         return userID;
     }
 
-    //로그인 DB
-    boolean logincheck(String _i, String _p) {
-        boolean flag = false;
-
-        String id = _i;
-        String pw = _p;
-
-        try {
-            String checkingStr = "SELECT pw FROM Client WHERE ID='" + id + "'";
-            ResultSet result = stmt.executeQuery(checkingStr);
-
-            int count = 0;
-            while(result.next()) {
-                if(pw.equals(result.getString("pw"))) {
-                    flag = true;
-                    System.out.println("로그인 성공");
-                }
-
-                else {
-                    flag = false;
-                    System.out.println("로그인 실패");
-                }
-                count++;
-            }
-        } catch(Exception e) {
-            flag = false;
-            System.out.println("로그인 실패 > " + e.toString());
-        }
-
-        return flag;
-    }
-
-    //회원가입 DB
-    boolean joinCheck(String _i, String _p, String _n, String _g, String _a, String _ph, String _ac, String _b) {
-        boolean flag = false;
-
-        String id = _i;
-        String pw = _p;
-        String nm = _n;
-        String gd = _g;
-        String ag = _a;
-        String ph = _ph;
-        String ac = _ac;
-        String bk = _b;
-
-        try {
-            String insertStr = "INSERT INTO Client VALUES('" + id + "', '" + pw + "' , '" + nm + "', '" + gd + "', '" + ag + "', '" + ph + "', '" + ac + "', '" + bk + "')";
-            stmt.executeUpdate(insertStr);
-
-            flag = true;
-            System.out.println("회원가입 성공");
-        } catch(Exception e) {
-            flag = false;
-            System.out.println("회원가입 실패 > " + e.toString());
-        }
-
-        return flag;
-    }
-
-    //아이디 중복 확인 DB
-    public boolean getIdByCheck(String id) {
-        boolean result = true;
-
-        try {
-            ps = con.prepareStatement("SELECT * FROM Client WHERE ID=?");
-            ps.setString(1, id.trim());
-            rs = ps.executeQuery(); //실행
-            if (rs.next())
-                result = false; //레코드가 존재하면 false
-
-        } catch (SQLException e) {
-            System.out.println(e + "=>  getIdByCheck fail");
-        }
-
-        return result;
-
-    }
 
 }
+
+
+
+

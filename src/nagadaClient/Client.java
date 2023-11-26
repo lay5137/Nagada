@@ -28,25 +28,28 @@ public class Client {
             new LoginGUI(this);		// 스윙 실행
 
             while (true) {
-                // Read messages from the server
-                receivedMessage = reader.readLine();
+                String message = reader.readLine();
+
+                if(message == null) {
+                    System.out.println("Server Not Open");
+                    break;
+                }
+
+                receivedMessage = message;
                 System.out.println("Client(" + clientIP + ") Receive: " + receivedMessage);
             }
         } catch (IOException e) {
             e.printStackTrace();
         } finally {
-            try {
-                socket.close();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
+            closeResources();
+            System.exit(0);
         }
 
     }
 
 
     // Method to send a message through the socket
-    public void sendMessage(String message) {
+    public synchronized void sendMessage(String message) {
         writer.println(message);
         writer.flush();
         System.out.println("Client(" + clientIP + ") Send: " + message);
@@ -59,6 +62,15 @@ public class Client {
     }
 
 
+    private void closeResources() {
+        try {
+            if (reader != null) reader.close();
+            if (writer != null) writer.close();
+            if (socket != null) socket.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
 
 
 }

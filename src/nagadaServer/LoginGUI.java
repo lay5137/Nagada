@@ -4,6 +4,11 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
 
 public class LoginGUI extends JFrame {
 
@@ -12,6 +17,15 @@ public class LoginGUI extends JFrame {
     private JButton buttonLogin;
     private JButton buttonSignUp;
     private Server server;
+
+    Connection conn;
+    String url = "jdbc:mysql://localhost:3306/nagada?serverTimezone=UTC";
+
+    String databaseID = "root";
+    String databasePW = "1234";
+
+    Statement stmt;
+    ResultSet result;
 
     public LoginGUI(Server server) {
         super("관리자 로그인 화면");
@@ -90,28 +104,48 @@ public class LoginGUI extends JFrame {
                 // Get the entered ID and PW
                 String enteredID = textID.getText();
                 char[] enteredPW = textPW.getPassword();
+                String enteredPWString = new String(enteredPW);
 
                 // Check if ID and PW are not empty
                 if (!enteredID.isEmpty() && enteredPW.length > 0) {
 
-                    // 데이터베이스에서 맞는지 확인하기
+                    try {
+                        // JDBC 드라이버 로드 및 데이터베이스 연결
+                        Class.forName("com.mysql.cj.jdbc.Driver");
+                        conn = DriverManager.getConnection(url, databaseID, databasePW);
+                        System.out.println("DB연결완료");
 
+                        // SQL 쿼리 실행
+                        stmt = conn.createStatement();
+                        String query = "SELECT * FROM user WHERE id = '" + enteredID + "' AND pw = '" + enteredPWString + "' AND position = '관리자'";
+                        result = stmt.executeQuery(query);
 
-                    // Wait for the result from the server
-                    boolean loginSuccess = true;
+                        boolean loginSuccessful = false;
+                        if (result.next()) {
+                            loginSuccessful = true; // 관리자 계정이 테이블에 존재하는 경우
+                            System.out.println("MANAGER_LOGIN_SUCCESS");
+                        } else {
+                            System.out.println("MANAGER_LOGIN_FAIL");
+                        }
 
-                    if (loginSuccess) {
-                        JOptionPane.showMessageDialog(
-                                LoginGUI.this,
-                                "로그인 성공"
-                        );
-                        setVisible(false);
-                        server.onLoginSuccess();
-                    } else {
-                        JOptionPane.showMessageDialog(
-                                LoginGUI.this,
-                                "로그인 실패"
-                        );
+                        // 로그인 결과에 따른 UI 피드백
+                        if (loginSuccessful) {
+                            JOptionPane.showMessageDialog(LoginGUI.this, "로그인 성공");
+                            setVisible(false);
+                            server.onLoginSuccess();
+                        } else {
+                            JOptionPane.showMessageDialog(LoginGUI.this, "로그인 실패");
+                        }
+
+                        // 자원 해제
+                        result.close();
+                        stmt.close();
+                        conn.close();
+
+                    } catch (ClassNotFoundException ex) {
+                        System.out.println("JDBC 드라이버 로드 오류");
+                    } catch (SQLException ex) {
+                        System.out.println("DB 연결 오류");
                     }
 
                 } else {
